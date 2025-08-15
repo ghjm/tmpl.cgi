@@ -77,6 +77,31 @@ Conditional content based on URI:
 
 ## Running the Server
 
+### Template Syntax Validation
+
+Before deploying, you can validate that all your templates are syntactically correct and will execute without errors:
+
+```bash
+# Build the binary first
+make tmpl.cgi
+
+# Check template syntax
+./tmpl.cgi -syntax-check
+
+# Or use the Makefile target
+make syntax-check
+
+# Check templates with a specific config file
+./tmpl.cgi -syntax-check -config path/to/config.yaml
+```
+
+The syntax checker will:
+- Verify the configuration file is valid YAML
+- Validate all regex patterns compile correctly
+- Parse all template files to check for syntax errors
+- Execute each template with sample data to catch runtime errors
+- Report which templates are valid or show detailed error messages
+
 ### As a Standalone Server (for testing)
 
 ```bash
@@ -105,6 +130,11 @@ The server will start on port 8080 by default. You can set the `TMPL_CGI_PORT` e
 3. Configure your web server to execute the binary as a CGI script
 
 4. Set the `TMPL_CGI_CONFIG` environment variable if your config file is not in the same directory as the binary
+
+### Command Line Options
+
+- `-syntax-check`: Validate all templates and exit (does not start server)
+- `-config path`: Specify path to configuration file
 
 ### Environment Variables
 

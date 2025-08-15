@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"net/http"
 	"net/http/cgi"
@@ -11,14 +12,30 @@ import (
 )
 
 func main() {
-	// Get config file path from environment or use default
-	configPath := os.Getenv("TMPL_CGI_CONFIG")
-	if configPath == "" {
-		configPath = "config.yaml"
+	// Parse command line flags
+	var syntaxCheck = flag.Bool("syntax-check", false, "Check template syntax and exit")
+	var configPath = flag.String("config", "", "Path to configuration file")
+	flag.Parse()
+
+	// Get config file path from flag, environment, or use default
+	if *configPath == "" {
+		*configPath = os.Getenv("TMPL_CGI_CONFIG")
+		if *configPath == "" {
+			*configPath = "config.yaml"
+		}
+	}
+
+	// If syntax check mode, run validation and exit
+	if *syntaxCheck {
+		if err := server.ValidateTemplates(*configPath); err != nil {
+			log.Fatalf("Template validation failed: %v", err)
+		}
+		log.Println("All templates are valid!")
+		return
 	}
 
 	// Create CGI server
-	srv, err := server.New(configPath)
+	srv, err := server.New(*configPath)
 	if err != nil {
 		// Check if it's a config file not found error and provide helpful message
 		if strings.Contains(err.Error(), "failed to load config") && strings.Contains(err.Error(), "no such file or directory") {

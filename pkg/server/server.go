@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"fmt"
 	"html/template"
 	"log"
@@ -166,4 +167,87 @@ func GetRequestURI(r *http.Request) string {
 		requestURI = r.URL.Path
 	}
 	return requestURI
+}
+
+// ValidateTemplates validates all templates in the configuration
+func ValidateTemplates(configPath string) error {
+	return ValidateTemplatesWithDeps(configPath, &OSFileReader{}, &OSTemplateLoader{})
+}
+
+// ValidateTemplatesWithDeps validates all templates with injectable dependencies
+func ValidateTemplatesWithDeps(configPath string, fileReader FileReader, templateLoader TemplateLoader) error {
+	configDir := filepath.Dir(configPath)
+
+	// Load configuration
+	data, err := fileReader.ReadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	cfg, err := config.ParseConfig(data)
+	if err != nil {
+		return fmt.Errorf("failed to parse config: %w", err)
+	}
+
+	// Validate regex patterns
+	_, err = config.CompilePatterns(cfg.Templates)
+	if err != nil {
+		return fmt.Errorf("invalid regex patterns: %w", err)
+	}
+
+	// Create sample template data for testing
+	sampleData := config.TemplateData{
+		RequestURI: "/test/path",
+		Request:    createSampleRequest(),
+	}
+
+	// Validate default template if specified
+	if cfg.DefaultTemplate != "" {
+		if err := validateTemplate(cfg.DefaultTemplate, configDir, templateLoader, sampleData); err != nil {
+			return fmt.Errorf("default template '%s': %w", cfg.DefaultTemplate, err)
+		}
+		log.Printf("✓ Default template '%s' is valid", cfg.DefaultTemplate)
+	}
+
+	// Validate pattern-specific templates
+	for _, tmplConfig := range cfg.Templates {
+		if err := validateTemplate(tmplConfig.Template, configDir, templateLoader, sampleData); err != nil {
+			return fmt.Errorf("template '%s' (pattern: %s): %w", tmplConfig.Template, tmplConfig.Pattern, err)
+		}
+		log.Printf("✓ Template '%s' (pattern: %s) is valid", tmplConfig.Template, tmplConfig.Pattern)
+	}
+
+	return nil
+}
+
+// validateTemplate validates a single template file
+func validateTemplate(templatePath string, configDir string, templateLoader TemplateLoader, sampleData config.TemplateData) error {
+	// Check if path is absolute, if not make it relative to templates directory in config dir
+	if !filepath.IsAbs(templatePath) {
+		templatePath = filepath.Join(configDir, "templates", templatePath)
+	}
+
+	// Parse the template
+	tmpl, err := templateLoader.ParseFiles(templatePath)
+	if err != nil {
+		return fmt.Errorf("failed to parse: %w", err)
+	}
+
+	// Test template execution with sample data
+	var buf bytes.Buffer
+	// Execute the template by name (the filename without path)
+	templateName := filepath.Base(templatePath)
+	if err := tmpl.ExecuteTemplate(&buf, templateName, sampleData); err != nil {
+		return fmt.Errorf("failed to execute with sample data: %w", err)
+	}
+
+	return nil
+}
+
+// createSampleRequest creates a minimal HTTP request for template testing
+func createSampleRequest() *http.Request {
+	req, _ := http.NewRequest("GET", "/test/path", nil)
+	req.Host = "example.com"
+	req.Header.Set("User-Agent", "Template-Validator/1.0")
+	return req
 }
