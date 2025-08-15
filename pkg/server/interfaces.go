@@ -7,7 +7,7 @@ type FileReader interface {
 	ReadFile(filename string) ([]byte, error)
 }
 
-// TemplateLoader interface for loading templates (for testing)
+// TemplateLoader interface for loading templates with Hugo-style functions (for testing)
 type TemplateLoader interface {
 	ParseFiles(filenames ...string) (*template.Template, error)
 }

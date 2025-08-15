@@ -4,6 +4,7 @@ A Go-based CGI server that serves HTML templates based on request URI patterns. 
 
 ## Features
 
+- **Hugo-style templating**: Full Sprig function library with 100+ template functions for advanced templating
 - **Pattern-based template routing**: Configure different templates for different URL patterns using regex
 - **Default template fallback**: Specify a default template for requests that don't match any patterns
 - **Template data access**: Templates can access the request URI and full request object
@@ -113,5 +114,74 @@ The server will start on port 8080 by default. You can set the `TMPL_CGI_PORT` e
 
 ### Template Functions
 
-The server uses Go's standard `html/template` package. You can use all built-in template functions and add custom ones by modifying the `loadTemplate` function in `main.go`.
+The server now uses **Hugo-style templating** with the full Sprig function library, providing over 100 additional template functions beyond Go's standard `html/template` package.
+
+#### Available Function Categories
+
+- **String Functions**: `upper`, `lower`, `title`, `camelcase`, `kebabcase`, `snakecase`, `trim`, `trunc`, `repeat`, `replace`, `regexFind`, `regexReplaceAll`, etc.
+- **Math Functions**: `add`, `sub`, `mul`, `div`, `mod`, `max`, `min`, `ceil`, `floor`, `round`, etc.
+- **Date Functions**: `now`, `date`, `dateInZone`, `duration`, `ago`, etc.
+- **List Functions**: `list`, `first`, `last`, `rest`, `initial`, `reverse`, `sort`, `uniq`, `join`, `split`, etc.
+- **Dict Functions**: `dict`, `get`, `set`, `keys`, `values`, `pick`, `omit`, etc.
+- **Encoding Functions**: `b64enc`, `b64dec`, `urlquery`, `htmlEscape`, `jsEscape`, etc.
+- **Crypto Functions**: `sha256sum`, `sha1sum`, `md5sum`, etc.
+- **UUID Functions**: `uuidv4`, etc.
+- **Default Functions**: `default`, `empty`, `coalesce`, etc.
+- **Flow Control**: `if`, `else`, `range`, `with`, `eq`, `ne`, `lt`, `le`, `gt`, `ge`, `and`, `or`, `not`, etc.
+
+#### Template Examples with Hugo/Sprig Functions
+
+**String manipulation:**
+```html
+<h1>{{.RequestURI | upper}}</h1>
+<p>Page title: {{"hello world" | title}}</p>
+<p>Slug: {{.RequestURI | regexReplaceAll "^/" "" | kebabcase}}</p>
+```
+
+**Date and time:**
+```html
+<p>Current time: {{now | date "2006-01-02 15:04:05"}}</p>
+<p>Published: {{now | date "January 2, 2006"}}</p>
+```
+
+**Math operations:**
+```html
+<p>Total items: {{add 5 3}}</p>
+<p>Random reading time: {{randInt 1 10}} minutes</p>
+```
+
+**Lists and iteration:**
+```html
+{{$tags := list "golang" "templates" "hugo" "sprig"}}
+<ul>
+{{range $i, $tag := $tags}}
+  <li>Tag {{add $i 1}}: {{$tag | title}}</li>
+{{end}}
+</ul>
+```
+
+**URL and regex operations:**
+```html
+{{$postId := .RequestURI | regexFind "\\d+" | default "unknown"}}
+<p>Post ID: {{$postId}}</p>
+<p>Share URL: https://twitter.com/intent/tweet?text={{urlquery "Check this out!"}}</p>
+```
+
+**Conditional logic with defaults:**
+```html
+<p>{{.Title | default "Untitled Page"}}</p>
+{{if eq .RequestURI "/"}}
+  <h1>Welcome to the home page!</h1>
+{{else}}
+  <h1>{{.RequestURI | regexReplaceAll "^/" "" | title}}</h1>
+{{end}}
+```
+
+**Advanced string operations:**
+```html
+<p>Preview: {{"This is a very long content..." | trunc 50}}</p>
+<p>Repeated: {{"★" | repeat 5}}</p>
+```
+
+For a complete list of available functions, see the [Sprig Function Documentation](http://masterminds.github.io/sprig/).
 

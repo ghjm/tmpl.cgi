@@ -6,6 +6,21 @@
 <body>
     <h1>Default Template</h1>
     <p>Request URI: {{.RequestURI}}</p>
+    <p>Request URI (uppercase): {{.RequestURI | upper}}</p>
+    <p>Current time: {{now | date "2006-01-02 15:04:05"}}</p>
+    <p>Random UUID: {{uuidv4}}</p>
     <p>This is the default template for unmatched requests.</p>
+    
+    <!-- Demonstrating Hugo/Sprig template functions -->
+    <div>
+        <h2>Hugo/Sprig Template Functions Demo</h2>
+        <ul>
+            <li>String manipulation: {{"hello world" | title}}</li>
+            <li>Math: {{add 5 3}}</li>
+            <li>List operations: {{list "apple" "banana" "cherry" | join ", "}}</li>
+            <li>Conditional: {{if eq .RequestURI "/"}}Home page{{else}}Other page{{end}}</li>
+            <li>Default value: {{.NonExistentField | default "No value provided"}}</li>
+        </ul>
+    </div>
 </body>
 </html>

@@ -6,10 +6,38 @@
 <body>
     <h1>Blog Post</h1>
     <p>Request URI: {{.RequestURI}}</p>
+    
+    {{/* Extract post ID from URL using regex */}}
+    {{$postId := .RequestURI | regexFind "\\d+" | default "unknown"}}
+    
     <article>
-        <h2>Sample Blog Post Title</h2>
-        <p>This is a sample blog post template. The actual content would be loaded based on the post ID in the URL.</p>
-        <p>Post ID can be extracted from: {{.RequestURI}}</p>
+        <h2>Blog Post #{{$postId}}</h2>
+        <p class="meta">
+            Published: {{now | date "January 2, 2006"}} | 
+            Reading time: {{randInt 1 10}} minutes
+        </p>
+        
+        <div class="content">
+            <p>This is a sample blog post template for post ID: <strong>{{$postId}}</strong></p>
+            <p>The actual content would be loaded based on the post ID in the URL.</p>
+            
+            <!-- Demonstrate more Hugo/Sprig functions -->
+            <h3>Advanced Template Features:</h3>
+            <ul>
+                {{range $i, $tag := list "golang" "templates" "hugo" "sprig"}}
+                <li>Tag {{add $i 1}}: <span class="tag">{{$tag | title}}</span></li>
+                {{end}}
+            </ul>
+            
+            <p>Post URL slug: {{.RequestURI | regexReplaceAll "^/blog/" "" | kebabcase}}</p>
+            <p>Truncated content: {{"This is a very long blog post content that should be truncated for preview purposes." | trunc 50}}</p>
+        </div>
+        
+        <footer>
+            <p>Share this post: 
+                <a href="https://twitter.com/intent/tweet?text={{urlquery (printf "Check out Blog Post #%s" $postId)}}">Twitter</a>
+            </p>
+        </footer>
     </article>
 </body>
 </html>
