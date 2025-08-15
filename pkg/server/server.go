@@ -6,42 +6,35 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"regexp"
+
+	"github.com/Masterminds/sprig/v3"
+	"gopkg.mhn.org/tmpl.cgi/pkg/debug"
 
 	"gopkg.mhn.org/tmpl.cgi/pkg/config"
 )
 
 // CGIServer handles CGI requests
 type CGIServer struct {
-	config         config.Config
-	templates      map[string]*template.Template
-	patterns       []*regexp.Regexp
-	fileReader     FileReader
-	templateLoader TemplateLoader
-	configDir      string // Directory where config file is located
+	config    config.Config
+	templates map[string]*template.Template
+	patterns  []*regexp.Regexp
+	configDir string
 }
 
 // New creates a new CGI server instance
 func New(configPath string) (*CGIServer, error) {
-	return NewWithDeps(configPath, &OSFileReader{}, &OSTemplateLoader{})
-}
-
-// NewWithDeps creates a new CGI server instance with injectable dependencies
-func NewWithDeps(configPath string, fileReader FileReader, templateLoader TemplateLoader) (*CGIServer, error) {
 	server := &CGIServer{
-		templates:      make(map[string]*template.Template),
-		fileReader:     fileReader,
-		templateLoader: templateLoader,
-		configDir:      filepath.Dir(configPath),
+		templates: make(map[string]*template.Template),
+		configDir: filepath.Dir(configPath),
 	}
 
-	// Load configuration
 	if err := server.loadConfig(configPath); err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// Load templates
 	if err := server.loadTemplates(); err != nil {
 		return nil, fmt.Errorf("failed to load templates: %w", err)
 	}
@@ -51,7 +44,7 @@ func NewWithDeps(configPath string, fileReader FileReader, templateLoader Templa
 
 // loadConfig loads the configuration from YAML file
 func (s *CGIServer) loadConfig(configPath string) error {
-	data, err := s.fileReader.ReadFile(configPath)
+	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return fmt.Errorf("failed to read config file: %w", err)
 	}
@@ -103,7 +96,7 @@ func (s *CGIServer) loadTemplate(templatePath string) (*template.Template, error
 		templatePath = filepath.Join(s.configDir, "templates", templatePath)
 	}
 
-	tmpl, err := s.templateLoader.ParseFiles(templatePath)
+	tmpl, err := template.New(filepath.Base(templatePath)).Funcs(sprig.FuncMap()).ParseFiles(templatePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse template file '%s': %w", templatePath, err)
 	}
@@ -130,15 +123,31 @@ func (s *CGIServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Request:    r,
 	}
 
-	// Set content type
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-
-	// Execute template
-	if err := tmpl.Execute(w, data); err != nil {
+	// Execute template into a buffer first to catch debug before writing to response
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
 		log.Printf("Template execution error for '%s': %v", templateName, err)
-		http.Error(w, "Template execution failed", http.StatusInternalServerError)
+
+		// Set content type for error responses
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+		// Check if debug mode is enabled
+		if debug.IsDebugEnabled() {
+			debug.RenderDebugError(w, [][2]string{
+				{"Template Name", templateName},
+				{"Request URI", requestURI},
+				{"Error", err.Error()},
+			})
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte("Template execution failed"))
+		}
 		return
 	}
+
+	// Set content type and write successful response
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write(buf.Bytes())
 }
 
 // FindTemplate finds the appropriate template for the given request URI
@@ -171,15 +180,10 @@ func GetRequestURI(r *http.Request) string {
 
 // ValidateTemplates validates all templates in the configuration
 func ValidateTemplates(configPath string) error {
-	return ValidateTemplatesWithDeps(configPath, &OSFileReader{}, &OSTemplateLoader{})
-}
-
-// ValidateTemplatesWithDeps validates all templates with injectable dependencies
-func ValidateTemplatesWithDeps(configPath string, fileReader FileReader, templateLoader TemplateLoader) error {
 	configDir := filepath.Dir(configPath)
 
 	// Load configuration
-	data, err := fileReader.ReadFile(configPath)
+	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return fmt.Errorf("failed to read config file: %w", err)
 	}
@@ -203,7 +207,7 @@ func ValidateTemplatesWithDeps(configPath string, fileReader FileReader, templat
 
 	// Validate default template if specified
 	if cfg.DefaultTemplate != "" {
-		if err := validateTemplate(cfg.DefaultTemplate, configDir, templateLoader, sampleData); err != nil {
+		if err := validateTemplate(cfg.DefaultTemplate, configDir, sampleData); err != nil {
 			return fmt.Errorf("default template '%s': %w", cfg.DefaultTemplate, err)
 		}
 		log.Printf("✓ Default template '%s' is valid", cfg.DefaultTemplate)
@@ -211,7 +215,7 @@ func ValidateTemplatesWithDeps(configPath string, fileReader FileReader, templat
 
 	// Validate pattern-specific templates
 	for _, tmplConfig := range cfg.Templates {
-		if err := validateTemplate(tmplConfig.Template, configDir, templateLoader, sampleData); err != nil {
+		if err := validateTemplate(tmplConfig.Template, configDir, sampleData); err != nil {
 			return fmt.Errorf("template '%s' (pattern: %s): %w", tmplConfig.Template, tmplConfig.Pattern, err)
 		}
 		log.Printf("✓ Template '%s' (pattern: %s) is valid", tmplConfig.Template, tmplConfig.Pattern)
@@ -221,23 +225,22 @@ func ValidateTemplatesWithDeps(configPath string, fileReader FileReader, templat
 }
 
 // validateTemplate validates a single template file
-func validateTemplate(templatePath string, configDir string, templateLoader TemplateLoader, sampleData config.TemplateData) error {
+func validateTemplate(templatePath string, configDir string, sampleData config.TemplateData) error {
 	// Check if path is absolute, if not make it relative to templates directory in config dir
 	if !filepath.IsAbs(templatePath) {
 		templatePath = filepath.Join(configDir, "templates", templatePath)
 	}
 
 	// Parse the template
-	tmpl, err := templateLoader.ParseFiles(templatePath)
+	tmpl, err := template.ParseFiles(templatePath)
 	if err != nil {
 		return fmt.Errorf("failed to parse: %w", err)
 	}
 
 	// Test template execution with sample data
 	var buf bytes.Buffer
-	// Execute the template by name (the filename without path)
-	templateName := filepath.Base(templatePath)
-	if err := tmpl.ExecuteTemplate(&buf, templateName, sampleData); err != nil {
+	// Execute the template directly (same as production behavior)
+	if err := tmpl.Execute(&buf, sampleData); err != nil {
 		return fmt.Errorf("failed to execute with sample data: %w", err)
 	}
 

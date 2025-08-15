@@ -140,6 +140,7 @@ The server will start on port 8080 by default. You can set the `TMPL_CGI_PORT` e
 
 - `TMPL_CGI_PORT`: Port to use in standalone mode (default: 8080)
 - `TMPL_CGI_CONFIG`: Path to configuration file (default: config.yaml)
+- `TMPL_CGI_DEBUG`: Enable debug mode for detailed error messages (values: true, yes, 1)
 - `GATEWAY_INTERFACE`: Automatically set by web servers when running as CGI
 
 ### Template Functions
@@ -214,4 +215,42 @@ The server now uses **Hugo-style templating** with the full Sprig function libra
 ```
 
 For a complete list of available functions, see the [Sprig Function Documentation](http://masterminds.github.io/sprig/).
+
+## Debugging and Error Handling
+
+### Debug Mode
+
+When template execution fails, the server provides different levels of error information depending on the debug mode setting:
+
+**Production Mode (default):**
+- Returns a generic "Template execution failed" message
+- Logs detailed error information to the server logs
+- Suitable for production environments
+
+**Debug Mode:**
+- Returns a detailed HTML error page with:
+  - Request URI that caused the error
+  - Template name that failed
+  - Complete error details and stack trace
+  - Styled error page for easy reading
+
+**Enabling Debug Mode:**
+
+Set the `TMPL_CGI_DEBUG` environment variable to enable debug mode:
+
+```bash
+# Enable debug mode
+export TMPL_CGI_DEBUG=true
+# or
+export TMPL_CGI_DEBUG=yes
+# or  
+export TMPL_CGI_DEBUG=1
+
+# Disable debug mode (default)
+export TMPL_CGI_DEBUG=false
+# or
+unset TMPL_CGI_DEBUG
+```
+
+**Security Note:** Debug mode should only be enabled during development and testing. Always disable debug mode in production environments as it may expose sensitive information about your application structure and data.
 

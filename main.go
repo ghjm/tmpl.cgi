@@ -2,7 +2,10 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"gopkg.mhn.org/tmpl.cgi/pkg/debug"
 	"log"
+	"net"
 	"net/http"
 	"net/http/cgi"
 	"os"
@@ -10,6 +13,20 @@ import (
 
 	"gopkg.mhn.org/tmpl.cgi/pkg/server"
 )
+
+func fatalErr(stage string, err error) {
+	if debug.IsDebugEnabled() {
+		s := debug.RenderDebugErrorAsCGIString([][2]string{
+			{"Result", "Failed to start server"},
+			{"Stage", stage},
+			{"Error", err.Error()},
+		})
+		fmt.Print(s)
+		os.Exit(0)
+	} else {
+		log.Fatalf("%s failed: %v", stage, err)
+	}
+}
 
 func main() {
 	// Parse command line flags
@@ -38,19 +55,17 @@ func main() {
 	srv, err := server.New(*configPath)
 	if err != nil {
 		// Check if it's a config file not found error and provide helpful message
-		if strings.Contains(err.Error(), "failed to load config") && strings.Contains(err.Error(), "no such file or directory") {
-			if os.Getenv("TMPL_CGI_CONFIG") == "" {
-				log.Fatalf("Config file 'config.yaml' not found. Set TMPL_CGI_CONFIG to specify the config file to load.")
-			}
+		if strings.Contains(err.Error(), "failed to load config") && strings.Contains(err.Error(), "no such file or directory") && os.Getenv("TMPL_CGI_CONFIG") != "" && !debug.IsDebugEnabled() {
+			log.Fatalf("Config file 'config.yaml' not found.  Set TMPL_CGI_CONFIG or use -config to specify the config file to load.")
 		}
-		log.Fatalf("Failed to create CGI server: %v", err)
+		fatalErr("Creating CGI server", err)
 	}
 
 	// Check if running as CGI
 	if os.Getenv("GATEWAY_INTERFACE") != "" {
 		// Running as CGI
 		if err := cgi.Serve(srv); err != nil {
-			log.Fatalf("CGI server error: %v", err)
+			fatalErr("Serving CGI server", err)
 		}
 	} else {
 		// Running as standalone server for testing
@@ -59,10 +74,15 @@ func main() {
 			port = "8080"
 		}
 
+		ln, err := net.Listen("tcp", ":"+port)
+		if err != nil {
+			fatalErr(fmt.Sprintf("Listening on port %s", port), err)
+		}
+
 		log.Printf("Starting test server on port %s", port)
 
-		if err := http.ListenAndServe(":"+port, srv); err != nil {
-			log.Fatalf("Server error: %v", err)
+		if err := http.Serve(ln, srv); err != nil {
+			fatalErr("Error in test server", err)
 		}
 	}
 }
