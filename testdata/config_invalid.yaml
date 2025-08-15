@@ -1,0 +1,6 @@
+default_template: "default.html"
+templates:
+  - pattern: "^/api/.*"
+    template: "api.html"
+  - pattern: "[invalid regex"
+    template: "invalid.html"

@@ -1,0 +1,59 @@
+---
+name: ci_checks
+
+on:
+
+  pull_request:
+    branches:
+      - main
+
+  push:
+    branches:
+      - main
+
+env:
+  GO_VERSION: '1.24'
+
+jobs:
+
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+      packages: write
+      security-events: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: go
+        
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v3
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Check Go code formatting
+      run: make check-fmt
+
+    - name: Run Go linters
+      uses: golangci/golangci-lint-action@v8
+      with:
+        version: latest
+        skip-cache: true
+
+    - name: Run tests
+      run: make test
+

@@ -1,0 +1,8 @@
+default_template: "default.html"
+templates:
+  - pattern: "^/api/.*"
+    template: "api.html"
+  - pattern: "^/admin/.*"
+    template: "admin.html"
+  - pattern: "^/blog/\\d+$"
+    template: "blog_post.html"
