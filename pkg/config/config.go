@@ -113,6 +113,7 @@ func (c *Config) validateTemplate(t *Template) error {
 
 	sampleData := &TemplateData{
 		RequestURI: "/test/path",
+		Data:       c.Data,
 	}
 	if t.TestURI != "" {
 		sampleData.RequestURI = t.TestURI
