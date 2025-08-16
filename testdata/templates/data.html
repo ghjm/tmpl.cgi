@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Data Page</title>
+</head>
+<body>
+    <h1>Data Template</h1>
+    <p>Request URI: {{.RequestURI}}</p>
+    <p>Request URI (uppercase): {{.RequestURI | upper}}</p>
+    <p>Current time: {{now | date "2006-01-02 15:04:05"}}</p>
+    <p>Random UUID: {{uuidv4}}</p>
+    <p>This template demonstrates retrieving configured static data.</p>
+    
+    <!-- Demonstrating static data retrieval -->
+    <div>
+        <h2>Static Data Retrieval Demo</h2>
+        <ul>
+            <li>foo: {{.Data.foo}}</li>
+            <li>bar: {{.Data.bar}}</li>
+        </ul>
+    </div>
+</body>
+</html>

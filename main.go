@@ -3,13 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"gopkg.mhn.org/tmpl.cgi/pkg/debug"
 	"log"
-	"net"
-	"net/http"
-	"net/http/cgi"
 	"os"
-	"strings"
+
+	"gopkg.mhn.org/tmpl.cgi/pkg/config"
+	"gopkg.mhn.org/tmpl.cgi/pkg/debug"
 
 	"gopkg.mhn.org/tmpl.cgi/pkg/server"
 )
@@ -30,7 +28,7 @@ func fatalErr(stage string, err error) {
 
 func main() {
 	// Parse command line flags
-	var syntaxCheck = flag.Bool("syntax-check", false, "Check template syntax and exit")
+	var validate = flag.Bool("validate", false, "Validate configuration and exit")
 	var configPath = flag.String("config", "", "Path to configuration file")
 	flag.Parse()
 
@@ -42,47 +40,29 @@ func main() {
 		}
 	}
 
+	cfg, err := config.ParseConfigFile(*configPath)
+	if err != nil {
+		fatalErr("Failed to parse configuration file: %v", err)
+	}
+
 	// If syntax check mode, run validation and exit
-	if *syntaxCheck {
-		if err := server.ValidateTemplates(*configPath); err != nil {
-			log.Fatalf("Template validation failed: %v", err)
+	if *validate {
+		err = cfg.Validate()
+		if err != nil {
+			fatalErr("Config validation failed: %v", err)
 		}
 		log.Println("All templates are valid!")
 		return
 	}
 
 	// Create CGI server
-	srv, err := server.New(*configPath)
+	srv, err := server.New(cfg)
 	if err != nil {
-		// Check if it's a config file not found error and provide helpful message
-		if strings.Contains(err.Error(), "failed to load config") && strings.Contains(err.Error(), "no such file or directory") && os.Getenv("TMPL_CGI_CONFIG") != "" && !debug.IsDebugEnabled() {
-			log.Fatalf("Config file 'config.yaml' not found.  Set TMPL_CGI_CONFIG or use -config to specify the config file to load.")
-		}
 		fatalErr("Creating CGI server", err)
 	}
 
-	// Check if running as CGI
-	if os.Getenv("GATEWAY_INTERFACE") != "" {
-		// Running as CGI
-		if err := cgi.Serve(srv); err != nil {
-			fatalErr("Serving CGI server", err)
-		}
-	} else {
-		// Running as standalone server for testing
-		port := os.Getenv("TMPL_CGI_PORT")
-		if port == "" {
-			port = "8080"
-		}
-
-		ln, err := net.Listen("tcp", ":"+port)
-		if err != nil {
-			fatalErr(fmt.Sprintf("Listening on port %s", port), err)
-		}
-
-		log.Printf("Starting test server on port %s", port)
-
-		if err := http.Serve(ln, srv); err != nil {
-			fatalErr("Error in test server", err)
-		}
+	err = srv.Run()
+	if err != nil {
+		fatalErr("Running CGI server", err)
 	}
 }

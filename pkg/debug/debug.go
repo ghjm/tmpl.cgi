@@ -3,17 +3,28 @@ package debug
 import (
 	"bytes"
 	"fmt"
-	"gopkg.mhn.org/tmpl.cgi/pkg/cgicapture"
 	"html/template"
 	"net/http"
 	"os"
 	"strings"
+
+	"gopkg.mhn.org/tmpl.cgi/pkg/cgicapture"
 )
+
+var debugGloballyEnabled bool
 
 // IsDebugEnabled checks if debug mode is enabled via TMPL_CGI_DEBUG environment variable
 func IsDebugEnabled() bool {
+	if debugGloballyEnabled {
+		return true
+	}
 	debug := strings.ToLower(os.Getenv("TMPL_CGI_DEBUG"))
 	return debug == "true" || debug == "yes" || debug == "1"
+}
+
+// SetDebugMode turns on debug mode globally
+func SetDebugMode() {
+	debugGloballyEnabled = true
 }
 
 func RenderDebugErrorAsCGIString(messages [][2]string) string {
@@ -72,4 +83,20 @@ func RenderDebugError(w http.ResponseWriter, messages [][2]string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusInternalServerError)
 	_, _ = buf.WriteTo(w)
+}
+
+func WriteDebugError(w http.ResponseWriter, messages [][2]string) {
+	if IsDebugEnabled() {
+		RenderDebugError(w, messages)
+	} else {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<html><head>
+<title>500 Server Error</title>
+</head><body>
+<h1>Server Error</h1>
+<p>The server encountered an error processing this request.</p>
+</body></html>`))
+	}
 }

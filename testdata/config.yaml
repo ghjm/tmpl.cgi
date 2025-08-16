@@ -1,8 +1,13 @@
-default_template: "default.html"
+default_template: "templates/default.html"
 templates:
   - pattern: "^/api/.*"
-    template: "api.html"
+    template: "templates/api.html"
   - pattern: "^/admin/.*"
-    template: "admin.html"
+    template: "templates/admin.html"
   - pattern: "^/blog/\\d+$"
-    template: "blog_post.html"
+    template: "templates/blog_post.html"
+  - pattern: "^/data.*"
+    template: "templates/data.html"
+data:
+  foo: bar
+  bar: baz
